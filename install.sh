@@ -55,18 +55,6 @@ else
     exit 1
 fi
 
-# Setup environment
-echo ""
-echo "🔧 Setting up environment..."
-python3 setup_environment.py
-
-if [ $? -eq 0 ]; then
-    echo "✅ Environment setup completed"
-else
-    echo "❌ Environment setup failed"
-    exit 1
-fi
-
 # Check for R installation
 echo ""
 echo "🔍 Checking R installation..."
