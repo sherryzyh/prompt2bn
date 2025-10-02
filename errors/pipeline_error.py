@@ -1,0 +1,2 @@
+class MissingGenerationsError(Exception):
+    pass

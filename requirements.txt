@@ -1,0 +1,25 @@
+# Core dependencies
+pandas>=1.5.0
+numpy>=1.21.0
+pyyaml>=6.0
+
+# LLM and AI
+openai>=1.0.0
+google-generativeai>=0.3.0
+python-dotenv>=1.0.0
+
+# Bayesian Networks and Causal Discovery
+pgmpy>=0.1.19
+cdt>=0.6.0
+
+# Graph processing
+networkx>=2.8.0
+
+# R integration
+rpy2>=3.5.0
+
+# Machine Learning
+scikit-learn>=1.1.0
+
+# Parallel processing
+joblib>=1.2.0
