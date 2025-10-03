@@ -1,0 +1,9 @@
+node,var_name,var_description,var_distribution
+1,asia,"visit to Asia","a two-level factor with levels yes and no."
+2,tub,"tuberculosis","a two-level factor with levels yes and no."
+3,smoke,"smoking","a two-level factor with levels yes and no."
+4,lung,"lung cancer","a two-level factor with levels yes and no."
+5,bronc,"bronchitis","a two-level factor with levels yes and no."
+6,either,"tuberculosis versus lung cancer/bronchitis","a two-level factor with levels yes and no."
+7,xray,"chest X-ray","a two-level factor with levels yes and no."
+8,dysp,"dyspnoae","a two-level factor with levels yes and no."

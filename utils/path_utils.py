@@ -89,9 +89,9 @@ def get_dataset_path(
     data_root = get_data_root(config)
     
     if source == "bnlearn":
-        base_dir = os.path.join(data_root, "BNlearnR")
+        base_dir = os.path.join(data_root, "bnlearn")
     elif source == "bnrep":
-        base_dir = os.path.join(data_root, "BnRep")
+        base_dir = os.path.join(data_root, "bnrep")
     else:
         raise ValueError(f"Unknown data source: {source}")
         
@@ -99,9 +99,9 @@ def get_dataset_path(
         return os.path.join(base_dir, dataset, f"{dataset}_dag.csv")
     elif file_type == "var":
         if source == "bnlearn":
-            return os.path.join(base_dir, dataset, f"{dataset}_bnlearn.csv")
+            return os.path.join(base_dir, dataset, f"{dataset}_metadata.csv")
         else:  # bnrep
-            return os.path.join(base_dir, dataset, f"{dataset}_var.csv")
+            return os.path.join(base_dir, dataset, f"{dataset}_metadata.csv")
     elif file_type == "samples":
         return os.path.join(base_dir, dataset, "samples", f"{dataset}_5000_1.csv")
     else:

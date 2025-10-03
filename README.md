@@ -1,57 +1,64 @@
 # BNSynth: Bayesian Network Synthesis Framework
 
-A toolkit for fast, flexible Bayesian network structure generation and refinement using both LLM-based and traditional statistical methods.
+BNSynth is a powerful and extensible toolkit for generating and refining Bayesian network structures, uniquely supporting both large language models (LLMs) and traditional statistical algorithms. With BNSynth, you can:
+- Leverage LLMs (OpenAI, Gemini, DeepSeek) for data-free structure generation and intelligent refinement
+- Apply classic algorithms (Hill Climbing, PC, MMHC) for data-driven learning and optimization
+- Combine LLM and traditional methods in modular, configurable workflows
 
----
+BNSynth is designed for researchers and practitioners seeking flexible, reproducible, and state-of-the-art tools for Bayesian network structural learning.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10+
-- R (for SHD calculation)
-- LLM API key
+- Python 3.10 – 3.12 (Python 3.13+ is not supported)
+- API key for one supported LLM provider:
+  - [OpenAI (GPT models)](https://platform.openai.com/api-keys): Sign up and create an API key at the OpenAI platform.
+  - [Gemini](https://aistudio.google.com/app/apikey): Sign in with your Google account and generate a Gemini API key.
+  - [DeepSeek](https://platform.deepseek.com/api-keys): Register and create an API key on the DeepSeek platform.
 
-*Supported LLM Providers:*
-- OpenAI (GPT models)
-- Gemini
-- DeepSeek
-
-> You can use any of these providers—just set the appropriate API key in your `.env` file. Only one is required.
+> Set the appropriate API key in your `.env` file (see below). Only one provider is required.
 
 ### Installation
-```bash
-# Clone and enter the repo
-git clone https://github.com/yourusername/bnsynth.git
-cd bnsynth
 
-# (Recommended) Create a virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+1. **Configure API Key**
 
-# Install all dependencies
-./install.sh
-```
+   Set your API key for your preferred LLM provider (OpenAI, Gemini, or DeepSeek):
+   ```bash
+   echo "OPENAI_API_KEY=your-actual-key-here" > .env
+   # or
+   # echo "GEMINI_API_KEY=your-gemini-key-here" > .env
+   # or
+   # echo "DEEPSEEK_API_KEY=your-deepseek-key-here" > .env
+   ```
 
-### Configure API Key
-```bash
-# Set your API key for your preferred LLM provider (OpenAI, Gemini, or DeepSeek)
-echo "OPENAI_API_KEY=your-actual-key-here" > .env
-# or
-# echo "GEMINI_API_KEY=your-gemini-key-here" > .env
-# or
-# echo "DEEPSEEK_API_KEY=your-deepseek-key-here" > .env
-```
+2. **Install R & Required Packages**
 
-### Install R & Required Packages
-```bash
-# macOS:   brew install r
-# Ubuntu:  sudo apt-get install r-base
-# Windows: Download from r-project.org
+   Install R and the required R packages:
+   ```bash
+   # macOS:   brew install r
+   # Ubuntu:  sudo apt-get install r-base
+   # Windows: Download from r-project.org
+   
+   # In R console:
+   if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+   BiocManager::install(c("graph","RBGL","pcalg"))
+   ```
 
-# In R console:
-if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-BiocManager::install(c("graph","RBGL","pcalg"))
-```
+3. **Install BNSynth and Python Dependencies**
+
+   Clone the repository, set up a virtual environment, and install dependencies:
+   ```bash
+   # Clone and enter the repo
+   git clone https://github.com/sherryzyh/bnsynth
+   cd bnsynth
+
+   # (Recommended) Create a virtual environment
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+   # Install all dependencies
+   bash install.sh
+   ```
 
 ### Run Your First Workflow
 
@@ -75,106 +82,208 @@ You can get started immediately using the **sample data** and **sample configura
 
 That's it! You can now explore results or try customizing your workflow further.
 
----
+## 📂 Input Data: Structure and Examples
 
-## 🏗️ Project Structure
-```
-bnsynth/
-├── run.py                 # Main entry point
-├── workflow_controller.py # Workflow orchestration
-├── llm.py                 # LLM client wrapper
-├── generators/            # Structure generators
-├── refiners/              # Structure refiners
-├── utils/                 # Utility functions
-├── configs/               # [Sample]YAML experiment configs
-├── data/                  # [Sample]Input datasets
-└── README.md
-```
+BNSynth supports two data sources: `bnlearn` and `bnrep`. Both use the same folder and file structure. Place your datasets under either `data/bnlearn/{dataset_name}/` or `data/bnrep/{dataset_name}/` as appropriate.
 
----
+- **bnlearn datasets** can be downloaded from: [https://www.bnlearn.com/bnrepository/](https://www.bnlearn.com/bnrepository/)
+- **bnrep datasets** can be downloaded from: [https://github.com/manueleleonelli/bnRep/tree/master/data](https://github.com/manueleleonelli/bnRep/tree/master/data)
 
-## 📂 Input Data Structure
-
-Place your datasets under `data/BNlearnR/{dataset_name}/` (or `data/BnRep/{dataset_name}/`) based on your data source. Example for the "asia" dataset (BNlearnR):
+Example folder structure (for the "asia" dataset):
 
 ```
 data/
-└── BNlearnR/
-    └── asia/
-        ├── asia_dag.csv           # True DAG structure
-        ├── asia_bnlearn.csv       # Variable metadata
-        └── samples/
-            ├── asia_5000_1.csv   # Observation samples
-            ├── asia_5000_2.csv
-            └── ...
+├── bnlearn/
+│   └── asia/
+│       ├── asia_dag.csv         # DAG adjacency matrix
+│       ├── asia_metadata.csv    # Variable metadata
+│       └── samples/
+│           ├── asia_5000_1.csv  # Observation samples
+│           ├── asia_5000_2.csv
+│           └── ...
+└── bnrep/
+    └── ...
 ```
 
-- **DAG CSV**: Adjacency matrix or edge list
-- **Metadata CSV**: Variable names/descriptions
-- **Samples**: Observational data (one or more files)
+The file naming and structure are the same for both sources.
 
 ---
+**Observation Samples (CSV)**
 
-## ⚡ Basic Usage
+*Each sample file contains observational data for the Bayesian network. Each row is a single observation (sample), and each column is a variable. Values are typically categorical (e.g., yes/no).* 
 
-### Supported Workflows
-- **Generation only**: Create BN structures from scratch
-- **Refinement only**: Refine existing BN structures
-- **Unified pipeline (generation + refinement)**: *Coming soon!*
+File: `samples/asia_5000_1.csv`
 
-> For now, you can run generation and then run refinement separately for the same dataset to achieve a full pipeline.
-
-### Run Generation Workflow
-```bash
-python run.py --config configs/sample_generation_only.yaml
-```
-
-### Run Refinement Workflow
-```bash
-python run.py --config configs/sample_refinement_only.yaml
-```
-
-### Use Your Own Data
-1. Place your files as shown above
-2. Update the config YAML with your dataset name and paths
-3. Run as above
+|   | asia | tub | smoke | lung | bronc | either | xray | dysp |
+|---|------|-----|-------|------|-------|--------|------|------|
+| 1 | no   | no  | yes   | no   | no    | no     | no   | no   |
+| 2 | no   | no  | no    | no   | no    | no     | no   | no   |
+| 3 | no   | no  | yes   | no   | no    | no     | no   | no   |
+| 4 | no   | no  | yes   | no   | no    | no     | no   | no   |
+| 5 | no   | no  | yes   | no   | yes   | no     | no   | yes  |
+| … | …    | …   | …     | …    | …     | …      | …    | …    |
 
 ---
+**DAG Structure (CSV)**
 
-## ⚙️ Minimal Configuration Example
+*The DAG CSV is an adjacency matrix representing the network structure. Rows and columns correspond to variables; a `1` in row `i`, column `j` indicates a directed edge from variable `i` to variable `j`.*
+
+File: `asia_dag.csv`
+
+|        | asia | tub | smoke | lung | bronc | either | xray | dysp |
+|--------|------|-----|-------|------|-------|--------|------|------|
+| asia   | 0    | 1   | 0     | 0    | 0     | 0      | 0    | 0    |
+| tub    | 0    | 0   | 0     | 0    | 0     | 1      | 0    | 0    |
+| smoke  | 0    | 0   | 0     | 1    | 1     | 0      | 0    | 0    |
+| lung   | 0    | 0   | 0     | 0    | 0     | 1      | 0    | 0    |
+| bronc  | 0    | 0   | 0     | 0    | 0     | 0      | 0    | 1    |
+| either | 0    | 0   | 0     | 0    | 0     | 0      | 1    | 1    |
+| xray   | 0    | 0   | 0     | 0    | 0     | 0      | 0    | 0    |
+| dysp   | 0    | 0   | 0     | 0    | 0     | 0      | 0    | 0    |
+
+---
+**Variable Metadata (CSV)**
+
+*The metadata CSV lists each variable, its name, a description, and its distribution. This provides context for interpreting the variables in the samples and DAG.*
+
+File: `asia_metadata.csv`
+
+| node | var_name | var_description                              | var_distribution                        |
+|------|----------|----------------------------------------------|-----------------------------------------|
+| 1    | asia     | visit to Asia                                | a two-level factor with levels yes and no.   |
+| 2    | tub      | tuberculosis                                | a two-level factor with levels yes and no.   |
+| 3    | smoke    | smoking                                     | a two-level factor with levels yes and no.   |
+| 4    | lung     | lung cancer                                 | a two-level factor with levels yes and no.   |
+| 5    | bronc    | bronchitis                                  | a two-level factor with levels yes and no.   |
+| 6    | either   | tuberculosis versus lung cancer/bronchitis   | a two-level factor with levels yes and no.   |
+| 7    | xray     | chest X-ray                                 | a two-level factor with levels yes and no.   |
+| 8    | dysp     | dyspnoae                                    | a two-level factor with levels yes and no.   |
+
+## 🛠️ Configuration Files: Structure and Examples
+
+BNSynth uses YAML configuration files to define experiment workflows, data sources, and algorithm settings. Place your configuration files in the `configs/` directory.
+
+### What is a Configuration File?
+
+A configuration file tells BNSynth:
+- Which workflow to run (generation, refinement, or pipeline)
+- Where to find your input data and where to save results
+- Which generator/refiner/model to use
+- How many times to repeat runs, and other experiment parameters
+
+### Where to Put Configurations
+
+All configuration YAMLs should be placed in the `configs/` directory at the project root.
+
+### Structure of a Configuration File
+
+A typical configuration file includes the following sections:
+
+- **workflow**: Specifies the type of workflow to run. Options are `"generation"`, `"refinement"`, or `"pipeline"`.
+- **data**: Contains information about input data and experiment outputs.
+  - input_data: Describes your input data setup:
+    - `root`: The root directory containing all input data. See [Input Data: Structure and Examples](#input-data-structure-and-examples) for details on directory organization.
+    - `dataset`: A list of dataset names to be used in the experiment.
+    - `source`: The data source for the datasets (e.g., `bnlearn` or `bnrep`).
+  - experiment_data: Specifies where experiment outputs are stored:
+    - `root`: The root directory for all experiment outputs (intermediate and final).
+    - `experiment_name`: The name of the experiment; a subfolder with this name will be created under the root.
+    - `generation`, `logs`, `results`, `statistics`, etc.: Subfolders within the experiment folder for generated Bayesian networks, logs, results, and statistics, respectively.
+- **observation**: The number of samples to use from the input data.
+- **generation**: Defines all parameters for the generation process (e.g., generator/model selection, number of runs). This section is required for the `generation` and `pipeline` workflows. 
+    - `repeated_run`: Number of times to repeat the generation process.
+    - `generator`: The generator algorithm to use (e.g., `promptbn`, `pgmpy_hill_climbing`).
+    - `model`(optional): This specifies the LLM model used in LLM-driven generator.
+- **refinement**: Defines all parameters for the refinement process (e.g., refiner/model selection, initialization). This section is required for the `refinement` and `pipeline` workflows.
+    - `data`: Specifies where to obtain the initial graphs for refinement, since refinement operates on existing structures.
+      - `init_generator`: The generator used to produce the initial graphs.
+      - `init_model`: The model used by the initial generator.
+      - `source_experiment`: The `experiment_name` of the corresponding generation experiment whose outputs will be refined.
+    - `refiner`: The refinement algorithm to use (e.g., `reactbn`).
+    - `model`(optional): This specifies the LLM model used in LLM-driven refiner.
+
+### Example: Generation Only
+
 ```yaml
-workflow: "generation"  # or "refinement"
+workflow: "generation"
 data:
   input_data:
     root: "data"
-    dataset: "asia"
+    dataset: ["asia"]
     source: "bnlearn"
   experiment_data:
     root: "experiments"
-    experiment_name: "my_experiment"
+    experiment_name: "generation_only"
     generation: "generations"
     logs: "logs"
     results: "results"
     statistics: "statistics"
 observation: 100
-
 generation:
   repeated_run: 3
   generator: "promptbn"
   model: "o3-mini"
-
-# or "refinement"
-# refinement:
-#   data:
-#     init_generator: "promptbn"
-#     init_model: "o3-mini"
-#     source_experiment: "previous_gen_experiment"
-#   refiner: "reactbn"
-#   model: "o3-mini"
-
 ```
 
----
+### Example: Refinement Only
+
+```yaml
+workflow: "refinement"
+data:
+  input_data:
+    root: "data"
+    dataset: ["asia"]
+    source: "bnlearn"
+  experiment_data:
+    root: "experiments"
+    experiment_name: "refinement_only"
+    generation: "generations"
+    histories: "histories"
+    logs: "logs"
+    results: "results"
+    statistics: "statistics"
+observation: 100
+refinement:
+  data:
+    init_generator: "promptbn"
+    init_model: "o3-mini"
+    source_experiment: "generation_only"
+  refiner: "reactbn"
+  model: "o3-mini"
+```
+### Tips
+
+- You can create new configs by copying and editing the samples in `configs/`.
+- For more details, see comments in the sample YAMLs or the documentation.
+
+## ⚡ Running Workflows
+
+BNSynth supports multiple workflows for Bayesian network structure learning. Choose the workflow that fits your needs, update the configuration as needed, and run with a single command.
+
+### Workflow Options
+
+| Workflow         | Description                                 |
+|------------------|---------------------------------------------|
+| Generation       | Create BN structures from scratch           |
+| Refinement       | Refine existing BN structures               |
+| Unified pipeline | Generation + refinement in one run *(Coming soon)* |
+
+> For now, run a generation workflow and then a refinement workflow separately for a full pipeline.
+
+### Prepare Your Data
+
+Before running a workflow, make sure your data is organized as described in the [Input Data](#input-data-structure-and-examples) for details on file and folder organization.
+
+### How to Run
+
+1. Create a configuration YAML in `configs/` (see above for details).
+2. Run the workflow using:
+   ```bash
+   python run.py --config <your_config_file.yaml>
+   ```
+3. Results and logs will be saved in the output directories specified in your config.
+
+To use your own data, place files as described in the Input Data section, update your config YAML, and run as above.
 
 ## 🐛 Troubleshooting
 - **R not found**: Install R and required packages as above
@@ -182,27 +291,20 @@ generation:
 - **Data loading errors**: Check your data directory and file names
 - **Import errors**: Activate your virtual environment
 
----
-
 ## 📄 License & Citation
 
 This project is licensed under the MIT License.
 
 If you use BNSynth in your research, please cite:
+
 ```bibtex
 @software{bnsynth,
   title={BNSynth: Bayesian Network Synthesis Framework},
-  author={Your Name},
+  author={Zhang, Yinghuan and Cui, Zijun and Zhang, Yufei},
   year={2025},
   url={https://github.com/sherryzyh/bnsynth}
 }
 ```
-
----
-
-For more details, advanced configuration, and troubleshooting, see the full documentation or open an issue on GitHub.
-
----
 
 ## 📬 Contact
 

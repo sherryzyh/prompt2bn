@@ -57,7 +57,6 @@ outputs/
 *.temp
 
 # Ignore statistics and intermediate files
-*.csv
 *.json
 *.tsv
 *.xls
