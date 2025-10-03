@@ -65,7 +65,7 @@ BNSynth is designed for researchers and practitioners seeking flexible, reproduc
 You can get started immediately using the **sample data** and **sample configuration files** provided in this repository.
 
 1. **Use the sample data:**
-   - A sample dataset is already included under `data/BNlearnR/` (e.g., the "asia" dataset).
+   - A sample dataset is already included under `data/bnlearn/` (e.g., the "asia" dataset).
 2. **Use the sample configuration:**
    - Sample config files are available in the `configs/` directory (e.g., `sample_generation_only.yaml`, `sample_refinement_only.yaml`).
 3. **Run a workflow:**
