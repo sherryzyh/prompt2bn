@@ -33,7 +33,7 @@ def write_result(
     if bn_generations is not None:
         generation_folder = os.path.join(
             exp_data_root,
-            config['data']['experiment_data']['generation'],
+            config['data']['experiment_data']['generations'],
             "bn",
         )
         os.makedirs(generation_folder, exist_ok=True)

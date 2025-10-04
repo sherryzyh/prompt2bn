@@ -1,3 +1,11 @@
+"""
+LLM-enhanced Bayesian Network refiner using ReAct framework.
+
+Implements the ReAct (Reason + Act) approach for BN structure refinement,
+combining LLM reasoning with traditional search to make intelligent
+decisions about graph modifications based on observation data.
+"""
+
 import logging
 import re
 import copy
@@ -11,10 +19,10 @@ from pgmpy.base import DAG
 from pgmpy.models import DiscreteBayesianNetwork
 from pgmpy.estimators import BIC
 from pgmpy.estimators import BDeu
-from typing import Tuple
+from typing import Optional, Tuple
 import itertools
 from collections import deque
-from joblib import Parallel, delayed  # Parallelization for candidate evaluation
+from joblib import Parallel, delayed
 
 from llm import LLMClient
 from .base import BaseRefiner
@@ -30,34 +38,31 @@ PLATEAU_COUNT = 3
 
 class ReActBNAgent(BaseRefiner):
     """
-    ReActBN: LLM-Enhanced Bayesian Network Structure Refiner for BNSynth.
-
-    This agent implements the ReAct (Reason + Act) framework for intelligent BN structure
-    refinement. It combines traditional hill climbing search with LLM-enhanced reasoning
-    to make more informed decisions about graph modifications, enabling data-dependent
-    structure optimization with intelligent guidance.
+    LLM-enhanced Bayesian Network structure refiner using ReAct framework.
     
-    The agent alternates between:
-    - Reasoning: Using LLM to understand the current state and evaluate actions
-    - Acting: Performing graph operations based on LLM guidance
+    Combines LLM reasoning with traditional search to make intelligent
+    decisions about graph modifications. Alternates between reasoning
+    (LLM analysis) and acting (graph operations).
     
-    This LLM-enforced approach leverages domain knowledge and adapts to different problem
-    contexts more effectively than pure statistical algorithms.
-    
-    Key features:
-    - ReAct framework for iterative reasoning and action
-    - LLM-guided decision making with domain knowledge  
-    - Support for various scoring functions (BIC, BDeu)
-    - Top-k candidate selection for better exploration
-    - Search history tracking for informed decisions
-    - Flexible action spaces and constraints
+    Attributes:
+        model: Name of the LLM model to use
+        logger: Logger instance for output
+        client: LLM client for API communication
+        scoring_method: Scoring function (BIC or BDeu)
     """
 
     def __init__(
         self,
         model: str,
-        logger: logging.Logger,
-    ):
+        logger: logging.Logger = None,
+    ) -> None:
+        """
+        Initialize ReActBN agent with LLM model and logger.
+        
+        Args:
+            model: Name of the LLM model to use
+            logger: Logger instance for output
+        """
         super().__init__(logger)
         self.scorer = None
         self.llm_client = LLMClient.from_model(model, logger)
@@ -66,7 +71,8 @@ class ReActBNAgent(BaseRefiner):
         self.history = []
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Name of the refiner implementation."""
         return "ReActBNAgent"
 
     def reason_and_act(
@@ -75,8 +81,17 @@ class ReActBNAgent(BaseRefiner):
         action_space: list,
     ) -> Tuple[str, int, float]:
         """
-        Use LLM to generate reasoning and decide on an action.
-        Returns (reasoning, action_idx, confidence).
+        Use LLM to reason about current state and select next action.
+        
+        Args:
+            state: Current state of the BN structure and search process
+            action_space: List of possible actions to choose from
+            
+        Returns:
+            Tuple containing:
+            - reasoning: LLM's explanation for the chosen action
+            - action_idx: Index of the selected action in action_space
+            - confidence: LLM's confidence score for the action
         """
         prompt = self._format_llm_prompt(state, action_space)
         messages = [
@@ -89,7 +104,11 @@ class ReActBNAgent(BaseRefiner):
         )
         return reasoning, action_idx, confidence
 
-    def _format_llm_prompt(self, state: dict, action_space: list) -> str:
+    def _format_llm_prompt(
+        self,
+        state: dict,
+        action_space: list,
+    ) -> str:
         """
         Formats the prompt for the LLM, including the current graph, score, action space, variable descriptions, and history.
         """
@@ -120,7 +139,10 @@ class ReActBNAgent(BaseRefiner):
         )
         return prompt
 
-    def _parse_llm_response(self, response: str) -> Tuple[int, str, float]:
+    def _parse_llm_response(
+        self,
+        response: str,
+    ) -> Tuple[int, str, float]:
         """
         Parses the LLM response to extract the action index, reasoning, and confidence.
         """
@@ -136,7 +158,11 @@ class ReActBNAgent(BaseRefiner):
         reasoning = reasoning_match.group(1).strip() if reasoning_match else response.strip()
         return action_idx, reasoning, confidence
 
-    def _load_scorer(self, scoring_method: str, observation: pd.DataFrame) -> None:
+    def _load_scorer(
+        self,
+        scoring_method: str,
+        observation: pd.DataFrame,
+    ) -> None:
         self.scoring_method = scoring_method
         if scoring_method.lower() == 'bic':
             self.scorer = BIC(observation)
@@ -146,7 +172,11 @@ class ReActBNAgent(BaseRefiner):
             raise ValueError(
                 f"Unknown scoring_method: {scoring_method}. Use 'bic' or 'bdeu'.")
 
-    def _initialize_state(self, current_graph, desc_variables):
+    def _initialize_state(
+        self,
+        current_graph: DiscreteBayesianNetwork,
+        desc_variables: str,
+    ) -> dict:
         """
         Explicitly initialize the state dictionary before the main loop.
         """
@@ -180,11 +210,11 @@ class ReActBNAgent(BaseRefiner):
 
     def run(
         self,
-        observation: pd.DataFrame,
         desc_variables: str,
-        dag_variables: list,
+        dag_variables: list[str],
         dag: pd.DataFrame,
-        init_generation: dict,
+        observation: pd.DataFrame,
+        init_generation: dict = None,
         tabu_length: int = 100,
         epsilon: float = 1e-4,
         max_iter: int = 20,
@@ -195,14 +225,30 @@ class ReActBNAgent(BaseRefiner):
         top_k: int = 10,
     ) -> dict:
         """
-        Optimized custom hill climbing structure learning with tabu, local scoring, and score caching.
-        Supports:
-        - max_indegree: maximum number of parents per node (int or None)
-        - forbidden_edges: list of (from, to) tuples that cannot be added/flipped
-        - required_edges: list of (from, to) tuples that cannot be removed/flipped
-        - start_dag: initial graph (as DiscreteBayesianNetwork or compatible dict)
-        - scoring_method: 'bic' or 'bdeu'
-        - top_k: number of top candidate actions to present to the LLM at each step
+        Refine BN structure using LLM-guided search with ReAct framework.
+        
+        Args:
+            desc_variables: Variable descriptions in string format
+            dag_variables: List of variable names
+            dag: True DAG structure as adjacency matrix
+            observation: Observed data for refinement
+            init_generation: Initial BN structure to refine
+            tabu_length: Length of tabu list to prevent cycles
+            epsilon: Minimum score improvement threshold
+            max_iter: Maximum number of iterations
+            max_indegree: Maximum number of parents per node
+            forbidden_edges: List of (from, to) tuples that cannot be added
+            required_edges: List of (from, to) tuples that cannot be removed
+            scoring_method: Scoring function ('bic' or 'bdeu')
+            top_k: Number of top candidates to present to LLM
+            
+        Returns:
+            Dict with results including:
+            - 'Matrix': Adjacency matrix of refined structure
+            - 'Graph': NetworkX graph representation
+            - 'Score': Final score achieved
+            - 'ActionHistory': List of actions taken
+            - 'MetricsHistory': Metrics at each iteration
         """
         self.history.clear()  # Clear action history
         self.nodes = dag_variables
@@ -405,7 +451,11 @@ class ReActBNAgent(BaseRefiner):
         result["ActionHistory"] = self.history
         return result
 
-    def _select_action(self, action_space: list, state: dict) -> dict:
+    def _select_action(
+        self,
+        action_space: list,
+        state: dict,
+    ) -> dict:
         # for each action, get the new graph and compute graph bic score
         delta_bic = {}
         for idx, action in enumerate(action_space):
@@ -414,7 +464,10 @@ class ReActBNAgent(BaseRefiner):
         # select the action with the highest delta BIC score
         return action_space[max(delta_bic, key=delta_bic.get)]
 
-    def _local_score_graph(self, graph: DiscreteBayesianNetwork) -> dict:
+    def _local_score_graph(
+        self,
+        graph: DiscreteBayesianNetwork,
+    ) -> dict:
         """
         Computes the local score of each node in a graph using the stored scorer.
         """
@@ -424,13 +477,19 @@ class ReActBNAgent(BaseRefiner):
             local_scores[node] = self.scorer.local_score(node, parents=parents)
         return local_scores
 
-    def _score_graph(self, graph: DiscreteBayesianNetwork) -> float:
+    def _score_graph(
+        self,
+        graph: DiscreteBayesianNetwork,
+    ) -> float:
         """
         Computes the score of a graph using the stored scorer.
         """
         return self.scorer.score(graph)
 
-    def _get_action_space(self, graph: DiscreteBayesianNetwork) -> list:
+    def _get_action_space(
+        self,
+        graph: DiscreteBayesianNetwork,
+    ) -> list:
         """
         Returns a list of all valid actions (add, delete, reverse) for the current graph.
         Each action is a dict: {"type": ..., "from": ..., "to": ...}
@@ -467,7 +526,11 @@ class ReActBNAgent(BaseRefiner):
 
         return actions
 
-    def execute_action(self, action: dict, state: dict) -> dict:
+    def execute_action(
+        self,
+        action: dict,
+        state: dict,
+    ) -> dict:
         """
         Applies the selected action to the current graph and returns the new graph and its score.
         """
@@ -493,7 +556,11 @@ class ReActBNAgent(BaseRefiner):
         new_score = self._score_graph(new_graph)
         return {"graph": new_graph, "score": new_score}
 
-    def get_reward(self, action_result: dict, state: dict) -> float:
+    def get_reward(
+        self,
+        action_result: dict,
+        state: dict,
+    ) -> float:
         """
         Computes the reward as the change in score after taking the action.
         """
@@ -560,7 +627,11 @@ class ReActBNAgent(BaseRefiner):
             "MoveCount": state.get("move_count", 0),
         }
 
-    def get_node_action_space_with_local_score(self, graph: DiscreteBayesianNetwork, node: str) -> list:
+    def get_node_action_space_with_local_score(
+        self,
+        graph: DiscreteBayesianNetwork,
+        node: str,
+    ) -> list:
         """
         Returns all valid add/delete/reverse actions for the given node, each with the resulting parent set and local score.
         Does not modify the original graph.
@@ -615,7 +686,15 @@ class ReActBNAgent(BaseRefiner):
                 })
         return actions
 
-    def _generate_legal_operations(self, current_graph, nodes, tabu_list, max_indegree, forbidden_edges, required_edges):
+    def _generate_legal_operations(
+        self,
+        current_graph: DiscreteBayesianNetwork,
+        nodes: list[str],
+        tabu_list: list[tuple[str, tuple[str, str]]],
+        max_indegree: int,
+        forbidden_edges: list[tuple[str, str]],
+        required_edges: list[tuple[str, str]],
+    ) -> list[tuple[str, tuple[str, str]]]:
         legal_ops = []
         # Generate all possible add operations
         for i, j in itertools.permutations(nodes, 2):
@@ -696,11 +775,11 @@ class ReActBNAgent(BaseRefiner):
 
     def _compute_and_log_metrics(
         self,
-        current_graph,
-        iteration,
-        current_score,
-        confidence,
-    ):
+        current_graph: DiscreteBayesianNetwork,
+        iteration: int,
+        current_score: float,
+        confidence: float,
+    ) -> tuple[float, float]:
         pred_adj = nx.to_numpy_array(
             current_graph, nodelist=self.nodes, weight=None, dtype=int)
         ref_adj = nx.to_numpy_array(
@@ -716,9 +795,18 @@ class ReActBNAgent(BaseRefiner):
 
     def _track_state_and_action(
         self,
-        current_graph, current_score, dag_variables, desc_variables,
-        iteration, current_shd, current_nhd, op_type, parent, child, best_score_delta,
-    ):
+        current_graph: DiscreteBayesianNetwork,
+        current_score: float,
+        dag_variables: list[str],
+        desc_variables: str,
+        iteration: int,
+        current_shd: float,
+        current_nhd: float,
+        op_type: str,
+        parent: str,
+        child: str,
+        best_score_delta: float,
+    ) -> tuple[dict, dict, float]:
         # Track state
         state = {
             'graph': current_graph,
@@ -739,11 +827,20 @@ class ReActBNAgent(BaseRefiner):
 
     def _log_step(
         self,
-        metrics_history, action_history,
-        iteration, current_score, current_nhd, current_shd,
-        action, action_idx, reward, confidence, reasoning, legal_ops_len,
-        terminated,
-    ):
+        metrics_history: list[dict],
+        action_history: list[dict],
+        iteration: int,
+        current_score: float,
+        current_nhd: float,
+        current_shd: float,
+        action: dict,
+        action_idx: int,
+        reward: float,
+        confidence: float,
+        reasoning: str,
+        legal_ops_len: int,
+        terminated: bool,
+    ) -> None:
         metrics_history.append({
             "iteration": iteration,
             "score": current_score,
@@ -767,8 +864,16 @@ class ReActBNAgent(BaseRefiner):
 
     def _finalize_result(
         self,
-        state, action, current_graph, current_score, current_shd, current_nhd, iteration, reward, metrics_history,
-    ):
+        state: Optional[dict],
+        action: dict,
+        current_graph: DiscreteBayesianNetwork,
+        current_score: float,
+        current_shd: float,
+        current_nhd: float,
+        iteration: int,
+        reward: float,
+        metrics_history: list[dict],
+    ) -> dict:
         if state is not None:
             state = self.update_state(
                 state,
@@ -795,7 +900,12 @@ class ReActBNAgent(BaseRefiner):
         result["ActionHistory"] = self.history  # Add action history to result
         return result
 
-    def _apply_operation_in_place(self, state, best_op, tabu_list):
+    def _apply_operation_in_place(
+        self,
+        state: dict,
+        best_op: tuple[str, tuple[str, str]],
+        tabu_list: list[tuple[str, tuple[str, str]]],
+    ) -> None:
         """
         Applies the given operation (add, remove, flip) in-place to the graph in the state dict and updates the tabu list.
         """

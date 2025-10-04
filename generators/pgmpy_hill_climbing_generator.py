@@ -1,8 +1,7 @@
 """
-PGMPY Hill Climbing generator for Bayesian network structure generation.
+Traditional hill climbing generator using pgmpy.
 
-This module implements the traditional hill climbing algorithm using pgmpy's
-HillClimbSearch with BIC scoring for generating Bayesian network structures from data.
+Implements structure generation using pgmpy's HillClimbSearch with BIC scoring.
 """
 
 import logging
@@ -17,11 +16,19 @@ class PgmpyHillClimbingGenerator(BaseGenerator):
     """
     Traditional hill climbing generator using pgmpy's HillClimbSearch.
     
-    This generator uses pgmpy's built-in hill climbing with BIC scoring
-    to generate Bayesian network structures from data.
+    Generates Bayesian network structures from observation data using
+    hill climbing search with BIC scoring.
+    
+    Attributes:
+        logger: Logger instance for output
+        max_iter: Maximum iterations for hill climbing
     """
     
-    def __init__(self, logger: Optional[logging.Logger] = None, max_iter: int = 20):
+    def __init__(
+        self,
+        logger: Optional[logging.Logger] = None,
+        max_iter: int = 20,
+    ) -> None:
         """
         Initialize the hill climbing generator.
         
@@ -34,13 +41,13 @@ class PgmpyHillClimbingGenerator(BaseGenerator):
     
     @property
     def name(self) -> str:
-        """Return the name of the generator."""
+        """Name of the generator implementation."""
         return "PgmpyHillClimbingGenerator"
     
     def run(
         self,
         desc_variables: str,
-        dag_variables: list,
+        dag_variables: list[str],
         observation: Optional[pd.DataFrame] = None,
         generations: Optional[list] = None,
         **kwargs
@@ -53,12 +60,17 @@ class PgmpyHillClimbingGenerator(BaseGenerator):
             dag_variables: List of variable names
             observation: Observed data for structure learning
             generations: Previous generations (unused, for compatibility)
-            **kwargs: Additional generator-specific parameters
+            **kwargs: Additional parameters (unused)
             
         Returns:
-            Tuple of (validation_status, results_dict) where:
+            Tuple containing:
             - validation_status: 1 if valid DAG, 0 otherwise
-            - results_dict: Dictionary containing generated structure
+            - results_dict: Dictionary with generated structure and metrics
+              including 'Generation' (structure representation) and 'Matrix'
+              (adjacency matrix)
+              
+        Raises:
+            ValueError: If observation data is missing or invalid
         """
         if observation is None:
             raise ValueError("Observation data is required for traditional generators")
@@ -78,10 +90,16 @@ class PgmpyHillClimbingGenerator(BaseGenerator):
             )
             
             # Convert to adjacency matrix
-            matrix = self._dag_to_adjacency_matrix(learned_model, dag_variables)
+            matrix = self._dag_to_adjacency_matrix(
+                dag=learned_model,
+                dag_variables=dag_variables,
+            )
             
             # Create a generation dict for compatibility
-            generation = self._dag_to_generation_dict(learned_model, dag_variables)
+            generation = self._dag_to_generation_dict(
+                dag=learned_model,
+                dag_variables=dag_variables,
+            )
             
             results = {
                 'Generation': generation,
@@ -92,6 +110,6 @@ class PgmpyHillClimbingGenerator(BaseGenerator):
             return 1, results  # Always return 1 for valid DAG
             
         except Exception as e:
-            self.logger.error(f"Error in hill climbing generation: {e}")
+            self.logger.error("Error in hill climbing generation: %s", e)
             return 0, {'Generation': None, 'Matrix': None}
     

@@ -1,8 +1,8 @@
 """
-Refiners module for Bayesian Network structure refinement.
+Refiners for Bayesian Network structure optimization.
 
-This module contains all methods that can refine existing Bayesian Network structures,
-including both LLM-enhanced agents and traditional algorithms adapted for refinement.
+Provides both LLM-enhanced (ReActBN) and traditional (Hill Climbing)
+refiners that improve existing BN structures using observation data.
 """
 
 from .base import BaseRefiner

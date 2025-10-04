@@ -1,16 +1,15 @@
 """
-BNSynth Base Generator Module
+Base interface for Bayesian Network structure generators.
 
-This module defines the base interface for Bayesian Network structure generators
-used in BNSynth. Supports both:
-- LLM-based generators: Data-free structure generation using language models (e.g., PromptBN)
-- Traditional generators: Data-dependent structure learning using statistical methods (e.g., Hill Climbing, PC, MMHC)
+Defines common API for both LLM-based and traditional 
+approaches to Bayesian Network structure generation.
 """
 
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 import pandas as pd
+import networkx as nx
 
 from llm import LLMClient
 from errors.generation_error import ParseResponseError, MaxRetriesError
@@ -18,14 +17,13 @@ from errors.generation_error import ParseResponseError, MaxRetriesError
 
 class BaseGenerator(ABC):
     """
-    Abstract base class for Bayesian Network structure generators in BNSynth.
+    Abstract base class for Bayesian Network structure generators.
     
-    This base class supports both:
-    - LLM-based generators: Data-free structure generation (e.g., PromptBN)
-    - Traditional generators: Data-dependent structure learning (e.g., Hill Climbing, PC, MMHC)
-    
-    LLM-based generators can create structures without observation data, while
-    traditional generators require observation data for statistical structure learning.
+    Attributes:
+        model: LLM model name (for LLM-based generators)
+        logger: Logger instance for output
+        client: LLM client (for LLM-based generators)
+        messages: Message history for LLM (for LLM-based generators)
     """
     
     def __init__(
@@ -58,19 +56,19 @@ class BaseGenerator(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Return the name of the generator."""
-        pass
+        """Name of the generator implementation."""
+        raise NotImplementedError("Subclasses must implement .name property")
     
     @property
     def is_llm_based(self) -> bool:
-        """Return True if this is an LLM-based generator."""
+        """Whether this generator uses an LLM for structure generation."""
         return self.model is not None
     
     @abstractmethod
     def run(
         self,
         desc_variables: str,
-        dag_variables: list,
+        dag_variables: list[str],
         observation: Optional[pd.DataFrame] = None,
         generations: Optional[list] = None,
         **kwargs
@@ -79,76 +77,122 @@ class BaseGenerator(ABC):
         Generate a Bayesian Network structure.
         
         Args:
-            desc_variables: Variable descriptions
+            desc_variables: Variable descriptions in string format
             dag_variables: List of variable names
             observation: Observed data for structure learning (required for traditional generators)
-            generations: Previous generations (unused, for compatibility)
+            generations: Previous generations (for compatibility)
             **kwargs: Additional generator-specific parameters
             
         Returns:
-            Tuple of (validation_status, results_dict) where:
+            Tuple containing:
             - validation_status: 1 if valid DAG, 0 otherwise
-            - results_dict: Dictionary containing:
-                - 'Generation': Generated structure representation
-                - 'Matrix': Adjacency matrix of learned structure
-                - Additional generator-specific results
+            - results_dict: Dictionary with generated structure and metrics
+              including 'Generation' (structure representation) and 'Matrix'
+              (adjacency matrix)
+              
+        Raises:
+            ValueError: If required inputs are missing or invalid
         """
-        pass
+        raise NotImplementedError("Subclasses must implement .run()")
     
     # LLM-specific methods (only used by LLM-based generators)
-    def prepare_messages(self, desc_variables: str, dag_variables: list) -> list:
+    def prepare_messages(self, desc_variables: str, dag_variables: list[str]) -> list[dict]:
         """
         Prepare messages for LLM generation.
-        Only implemented by LLM-based generators.
+        
+        Args:
+            desc_variables: Variable descriptions in string format
+            dag_variables: List of variable names
+            
+        Returns:
+            list[dict]: Messages formatted for LLM API
+            
+        Raises:
+            NotImplementedError: If called on non-LLM generator or not implemented
         """
         if not self.is_llm_based:
             raise NotImplementedError("prepare_messages() only available for LLM-based generators")
         raise NotImplementedError("Subclasses must implement .prepare_messages()")
     
-    def parse_response(self, response: str) -> Any:
+    def parse_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse LLM response.
-        Only implemented by LLM-based generators.
+        Parse LLM response into structured BN representation.
+        
+        Args:
+            response: Raw text response from LLM
+            
+        Returns:
+            Dict[str, Any]: Structured BN representation
+            
+        Raises:
+            NotImplementedError: If called on non-LLM generator or not implemented
+            ParseResponseError: If response cannot be parsed
         """
         if not self.is_llm_based:
             raise NotImplementedError("parse_response() only available for LLM-based generators")
         raise NotImplementedError("Subclasses must implement .parse_response()")
     
-    def generate(self, max_retries: int = 3) -> Any:
+    def generate(self, max_retries: int = 3) -> Dict[str, Any]:
         """
         Generate a Bayesian Network structure using the language model.
-        Only used by LLM-based generators.
+        
+        Args:
+            max_retries: Maximum number of retry attempts
+            
+        Returns:
+            Dict[str, Any]: Generated BN structure
+            
+        Raises:
+            NotImplementedError: If called on non-LLM generator
+            ParseResponseError: If response cannot be parsed
+            MaxRetriesError: If max retries reached
         """
         if not self.is_llm_based:
             raise NotImplementedError("generate() only available for LLM-based generators")
         
         for attempt in range(1, max_retries + 1):
-            self.logger.debug(f"Generating... ({attempt}/{max_retries})")
+            self.logger.debug("Generating... (%d/%d)", attempt, max_retries)
             response = self.client.chat(messages=self.messages)
-            self.logger.debug(f"Raw response:\n{response}")
+            self.logger.debug("Raw response:\n%s", response)
             try:
                 generation = self.parse_response(response)
-                self.logger.debug(f"JSON output:\n{generation}")
+                self.logger.debug("JSON output:\n%s", generation)
                 return generation
             except ParseResponseError as e:
-                self.logger.exception(f"Parse Response Error on attempt {attempt}: {e}")
+                self.logger.exception("Parse Response Error on attempt %d: %s", attempt, e)
                 raise e
             except Exception as e:
-                self.logger.exception(f"Exception on attempt {attempt}: {e}; Retrying...")
+                self.logger.exception("Exception on attempt %d: %s; Retrying...", attempt, e)
                 continue
         raise MaxRetriesError("Max retries reached")
     
-    def construct_matrix(self, generation: Any, dag_variables: list) -> pd.DataFrame:
+    def construct_matrix(
+        self,
+        generation: Dict[str, Any],
+        dag_variables: list[str],
+    ) -> pd.DataFrame:
         """
-        Construct adjacency matrix from generation.
-        Only implemented by LLM-based generators.
+        Construct adjacency matrix from generation dictionary.
+        
+        Args:
+            generation: Generated BN structure dictionary
+            dag_variables: List of variable names
+            
+        Returns:
+            pd.DataFrame: Adjacency matrix representation
+            
+        Raises:
+            NotImplementedError: If called on non-LLM generator or not implemented
         """
         if not self.is_llm_based:
             raise NotImplementedError("construct_matrix() only available for LLM-based generators")
         raise NotImplementedError("Subclasses must implement .construct_matrix()")
     
     # Utility methods (available to all generators)
-    def _validate_inputs(self, observation: Optional[pd.DataFrame] = None) -> None:
+    def _validate_inputs(
+        self,
+        observation: Optional[pd.DataFrame] = None,
+    ) -> None:
         """
         Validate input data.
         
@@ -167,7 +211,10 @@ class BaseGenerator(ABC):
         if observation is not None:
             self.logger.info("Input validation passed: %d variables, %d samples", len(observation.columns), len(observation))
     
-    def _log_results(self, results: Dict[str, Any]) -> None:
+    def _log_results(
+        self,
+        results: Dict[str, Any],
+    ) -> None:
         """
         Log generator results.
         
@@ -184,10 +231,20 @@ class BaseGenerator(ABC):
         if 'Generation' in results:
             self.logger.info("Structure generation completed successfully")
     
-    def _dag_to_adjacency_matrix(self, dag, dag_variables: list) -> pd.DataFrame:
+    def _dag_to_adjacency_matrix(
+        self,
+        dag: nx.DiGraph,
+        dag_variables: list[str],
+    ) -> pd.DataFrame:
         """
         Convert a DAG to adjacency matrix format.
-        Utility method for traditional generators.
+        
+        Args:
+            dag: NetworkX DiGraph or similar object with edges() method
+            dag_variables: List of variable names
+            
+        Returns:
+            pd.DataFrame: Adjacency matrix representation
         """
         matrix = pd.DataFrame(0, index=dag_variables, columns=dag_variables)
         
@@ -198,10 +255,20 @@ class BaseGenerator(ABC):
         
         return matrix
     
-    def _dag_to_generation_dict(self, dag, dag_variables: list) -> Dict[str, Any]:
+    def _dag_to_generation_dict(
+        self,
+        dag: nx.DiGraph,
+        dag_variables: list[str],
+    ) -> Dict[str, Any]:
         """
         Convert a DAG to generation dict format for compatibility.
-        Utility method for traditional generators.
+        
+        Args:
+            dag: NetworkX DiGraph or similar object with edges() method
+            dag_variables: List of variable names
+            
+        Returns:
+            Dict[str, Any]: BN structure in standard format
         """
         nodes = []
         edges = []

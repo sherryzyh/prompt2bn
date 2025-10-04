@@ -1,5 +1,7 @@
-from typing import Any, Optional
 import json
+import logging
+from typing import Any, Dict, Optional
+import pandas as pd
 
 from utils.graph_utils import construct_matrix_from_nodes
 from .base import BaseGenerator
@@ -69,92 +71,156 @@ You are an expert in building Bayesian Networks. You will receive variables in t
 
 class PromptBNGenerator(BaseGenerator):
     """
-    PromptBN Generator for BNSynth.
+    LLM-based Bayesian Network generator using prompt engineering.
     
-    LLM-based Bayesian Network structure generator that creates networks from
-    variable descriptions without requiring observation data (data-free generation).
-    Uses prompt engineering to leverage LLM's domain knowledge for structure creation.
+    Creates networks from variable descriptions without observation data
+    (data-free generation) by leveraging LLM domain knowledge.
+    
+    Attributes:
+        model: Name of the LLM model to use
+        logger: Logger instance for output
+        prompt: Template prompt for BN generation
+        messages: Message history for LLM
     """
 
-    def __init__(self, model: Any, logger: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        """
+        Initialize PromptBN generator with model and logger.
+        
+        Args:
+            model: Name of the LLM model to use
+            logger: Logger instance for output
+        """
         super().__init__(model, logger)
         self.prompt = BASELINE_PROMPT
         self.messages = []
-        self.logger.debug(f"[Model] {self.model}")
-        self.logger.debug(f"[Client] {type(self.client)}")
+        self.logger.debug("[Model] %s", self.model)
+        self.logger.debug("[Client] %s", type(self.client))
     
     @property
     def name(self) -> str:
-        """Return the name of the generator."""
+        """Name of the generator implementation."""
         return "PromptBNGenerator"
 
-    def prepare_user_prompt(self, desc_variables: Any, dag_variables: Any) -> str:
+    def prepare_user_prompt(self, desc_variables: str, dag_variables: list[str]) -> str:
         """
-        Format the user prompt with variable descriptions and DAG variables.
+        Format the user prompt with variable descriptions.
+        
+        Args:
+            desc_variables: Variable descriptions in string format
+            dag_variables: List of variable names (unused)
+            
+        Returns:
+            str: Formatted prompt for LLM
         """
         prompt = self.prompt.format(desc_variables=desc_variables)
         return prompt
 
-    def prepare_messages(self, desc_variables: Any, dag_variables: Any) -> list:
+    def prepare_messages(
+        self,
+        desc_variables: str,
+        dag_variables: list[str],
+    ) -> list[dict]:
         """
         Prepare the message list for the language model.
+        
+        Args:
+            desc_variables: Variable descriptions in string format
+            dag_variables: List of variable names
+            
+        Returns:
+            list[dict]: Messages formatted for LLM API
         """
         self.messages = [
             {"role": "system", "content": "You are a helpful assistant that constructs Bayesian Networks."},
             {"role": "user", "content": self.prepare_user_prompt(desc_variables, dag_variables)}
         ]
-        self.logger.debug(f"[Prompt] {self.messages[-1]['content']}")
+        self.logger.debug("[Prompt] %s", self.messages[-1]['content'])
         return self.messages
 
-    def construct_matrix(self, generation, dag_variables):
-        return construct_matrix_from_nodes(generation, dag_variables)
+    def construct_matrix(
+        self,
+        generation: Dict[str, Any],
+        dag_variables: list[str],
+    ) -> pd.DataFrame:
+        return construct_matrix_from_nodes(
+            generation=generation,
+            dag_variables=dag_variables,
+        )
 
-    def parse_response(self, response: str) -> Any:
+    def parse_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse the response from the language model.
+        Parse the response from the language model into structured BN representation.
+        
+        Args:
+            response: Raw text response from LLM
+            
+        Returns:
+            Dict[str, Any]: Structured BN representation
+            
+        Raises:
+            ParseResponseError: If response cannot be parsed as JSON
         """
         # Remove wrapping triple backticks (with or without 'json')
         content = response.replace("```json\n", "").replace("\n```", "").strip()
         try:
             return json.loads(content, strict=False)
         except json.JSONDecodeError as e:
-            self.logger.debug(f"Unjsonified Raw Generation:\n```json\n{response}\n```")
-            self.logger.exception(f"JSON Decode Error: {e}")
+            self.logger.debug("Unjsonified Raw Generation:\n```json\n%s\n```", response)
+            self.logger.exception("JSON Decode Error: %s", e)
             raise ParseResponseError(f"JSON Decode Error: {e}") from e
     
-    def run(self, desc_variables: str, dag_variables: list, observation=None, generations=None):
+    def run(
+        self,
+        desc_variables: str,
+        dag_variables: list[str],
+        observation: Optional[pd.DataFrame] = None,
+        generations: Optional[list] = None,
+        **kwargs
+    ) -> tuple[int, Dict[str, Any]]:
         """
         Generate a Bayesian Network structure using LLM.
         
         Args:
-            desc_variables: Variable descriptions
+            desc_variables: Variable descriptions in string format
             dag_variables: List of variable names
             observation: Observed data (unused for LLM-based generation)
             generations: Previous generations (unused)
+            **kwargs: Additional parameters (unused)
             
         Returns:
-            Tuple of (dag_validation, results_dict) where:
-            - dag_validation: 1 if valid DAG, 0 otherwise
-            - results_dict: Dictionary containing 'Generation' and 'Matrix'
+            Tuple containing:
+            - validation_status: 1 if valid DAG, 0 otherwise
+            - results_dict: Dictionary with generated structure and metrics
+              including 'Generation' (structure representation) and 'Matrix'
+              (adjacency matrix)
+              
+        Raises:
+            ParseResponseError: If LLM response cannot be parsed
+            MaxRetriesError: If max retries reached
         """
         self.messages = self.prepare_messages(desc_variables, dag_variables)
         try:    
             generation = self.generate()
         except ParseResponseError as e:
-            self.logger.exception(f"Parse Response Error: {e}")
+            self.logger.exception("Parse Response Error: %s", e)
             raise e
         except MaxRetriesError as e:
-            self.logger.exception(f"Max Retries Error: {e}; Retrying...")
+            self.logger.exception("Max Retries Error: %s; Retrying...", e)
             raise e
         
         try:
             matrix = self.construct_matrix(generation, dag_variables)
         except Exception as e:
-            self.logger.exception(f"Invalid DAG Error: {e}")
+            self.logger.exception("Invalid DAG Error: %s", e)
             raise e
         else:
-            self.logger.debug(f"Valid DAG, Raw generation:\n{generation}")
-            self.logger.debug(f"Constructed Matrix:\n{matrix}")
+            self.logger.debug("Valid DAG, Raw generation:\n%s", generation)
+            self.logger.debug("Constructed Matrix:\n%s", matrix)
         
         results = {
             "Generation": generation,

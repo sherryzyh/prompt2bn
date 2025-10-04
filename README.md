@@ -1,16 +1,28 @@
 # BNSynth: Bayesian Network Synthesis Framework
 
-BNSynth is a powerful and extensible toolkit for generating and refining Bayesian network structures, uniquely supporting both large language models (LLMs) and traditional statistical algorithms. With BNSynth, you can:
-- Leverage LLMs (OpenAI, Gemini, DeepSeek) for data-free structure generation and intelligent refinement
-- Apply classic algorithms (Hill Climbing, PC, MMHC) for data-driven learning and optimization
-- Combine LLM and traditional methods in modular, configurable workflows
+BNSynth is an open-source toolkit for generating and refining Bayesian network structures, supporting both large language models (LLMs) and classic statistical algorithms. It is designed for researchers and practitioners who need flexible, reproducible, and state-of-the-art workflows for structure learning.
 
-BNSynth is designed for researchers and practitioners seeking flexible, reproducible, and state-of-the-art tools for Bayesian network structural learning.
+### Features
+- Hybrid approach: combine LLM-based and algorithmic methods (Hill Climbing, PC, MMHC)
+- Data-free generation with LLMs (OpenAI, Gemini, DeepSeek) and data-driven optimization
+- Modular configuration for generation, refinement, or end-to-end workflows
+- Reproducible experiments with structured outputs (generations, logs, results, statistics)
+- Ready-to-use sample datasets and configurations
+
+### Table of Contents
+- [Quick Start](#quick-start)
+- [Input Data: Structure and Examples](#input-data-structure-and-examples)
+- [Configuration Files: Structure and Examples](#configuration-files-structure-and-examples)
+- [Running Workflows](#running-workflows)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License & Citation](#license--citation)
+- [Contact](#contact)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10 – 3.12 (Python 3.13+ is not supported)
+- Python 3.10–3.12 (Python 3.13+ is not yet supported)
 - API key for one supported LLM provider:
   - [OpenAI (GPT models)](https://platform.openai.com/api-keys): Sign up and create an API key at the OpenAI platform.
   - [Gemini](https://aistudio.google.com/app/apikey): Sign in with your Google account and generate a Gemini API key.
@@ -33,16 +45,44 @@ BNSynth is designed for researchers and practitioners seeking flexible, reproduc
 
 2. **Install R & Required Packages**
 
-   Install R and the required R packages:
-   ```bash
-   # macOS:   brew install r
-   # Ubuntu:  sudo apt-get install r-base
-   # Windows: Download from r-project.org
+   BNSynth requires R (≥ 4.3) with several Bioconductor packages for structure learning.
    
-   # In R console:
-   if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-   BiocManager::install(c("graph","RBGL","pcalg"))
+   **Install R:**
+   ```bash
+    # macOS
+    brew install r
+
+    # Ubuntu / Debian
+    sudo apt-get update
+    sudo apt-get install r-base
+
+    # Windows
+    Download from https://cran.r-project.org/
    ```
+   **Install R packages (inside R console):**
+   ```r
+    # Install BiocManager if missing
+    if (!requireNamespace("BiocManager", quietly=TRUE)) {
+        install.packages("BiocManager")
+    }
+
+    # Install required packages
+    BiocManager::install(c("graph","RBGL","pcalg"))
+   ```
+   **Verify R packages installation (inside R console):**
+   ```r
+    library(graph)
+    library(RBGL)
+    library(pcalg)
+   ```
+    If no error messages appear, the setup is correct.
+
+    macOS ARM64 (Apple Silicon) note
+    If you see errors like `libRblas.dylib` not found, reinstall R with Homebrew and OpenBLAS:
+    ```bash
+    brew reinstall r
+    brew reinstall openblas
+    ```
 
 3. **Install BNSynth and Python Dependencies**
 
@@ -80,7 +120,7 @@ You can get started immediately using the **sample data** and **sample configura
 4. **Check results:**
    - Outputs will be saved in the `experiments/` directory as specified in your config.
 
-That's it! You can now explore results or try customizing your workflow further.
+You're ready to explore results or customize your workflow further.
 
 ## 📂 Input Data: Structure and Examples
 
@@ -158,6 +198,17 @@ File: `asia_metadata.csv`
 | 6    | either   | tuberculosis versus lung cancer/bronchitis   | a two-level factor with levels yes and no.   |
 | 7    | xray     | chest X-ray                                 | a two-level factor with levels yes and no.   |
 | 8    | dysp     | dyspnoae                                    | a two-level factor with levels yes and no.   |
+ 
+## 🤝 Contributing
+
+Contributions are welcome! To propose changes:
+
+1. Fork the repository and create a feature branch.
+2. Make focused edits with clear commit messages.
+3. Ensure README examples remain accurate; add/update docs as needed.
+4. Open a pull request describing the motivation and changes.
+
+If you find a bug or have a feature request, please open an issue with steps to reproduce or a concise proposal.
 
 ## 🛠️ Configuration Files: Structure and Examples
 
@@ -188,7 +239,7 @@ A typical configuration file includes the following sections:
   - experiment_data: Specifies where experiment outputs are stored:
     - `root`: The root directory for all experiment outputs (intermediate and final).
     - `experiment_name`: The name of the experiment; a subfolder with this name will be created under the root.
-    - `generation`, `logs`, `results`, `statistics`, etc.: Subfolders within the experiment folder for generated Bayesian networks, logs, results, and statistics, respectively.
+    - `generations`, `logs`, `results`, `statistics`, etc.: Subfolders within the experiment folder for generated Bayesian networks, logs, results, and statistics, respectively.
 - **observation**: The number of samples to use from the input data.
 - **generation**: Defines all parameters for the generation process (e.g., generator/model selection, number of runs). This section is required for the `generation` and `pipeline` workflows. 
     - `repeated_run`: Number of times to repeat the generation process.
@@ -214,7 +265,7 @@ data:
   experiment_data:
     root: "experiments"
     experiment_name: "generation_only"
-    generation: "generations"
+    generations: "generations"
     logs: "logs"
     results: "results"
     statistics: "statistics"
@@ -237,7 +288,7 @@ data:
   experiment_data:
     root: "experiments"
     experiment_name: "refinement_only"
-    generation: "generations"
+    generations: "generations"
     histories: "histories"
     logs: "logs"
     results: "results"

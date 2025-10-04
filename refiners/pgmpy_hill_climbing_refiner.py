@@ -1,8 +1,7 @@
 """
-PGMPY Hill Climbing refiner for Bayesian network structure refinement.
+Traditional hill climbing refiner using pgmpy.
 
-This module implements the traditional hill climbing algorithm using pgmpy's
-HillClimbSearch with BIC scoring for refining existing Bayesian network structures.
+Implements structure refinement using pgmpy's HillClimbSearch with BIC scoring.
 """
 
 import logging
@@ -12,7 +11,7 @@ from pgmpy.base import DAG
 from pgmpy.estimators import HillClimbSearch, BIC
 import networkx as nx
 
-from errors.generation_error import InvalidDAGError
+# Import error types that might be used in exception handling
 from utils.eval_utils import evaluate_generation
 from utils.graph_utils import generation_dict_to_discrete_bn
 from .base import BaseRefiner
@@ -22,14 +21,18 @@ class PgmpyHillClimbingRefiner(BaseRefiner):
     """
     Traditional hill climbing refiner using pgmpy's HillClimbSearch.
     
-    This refiner uses pgmpy's built-in hill climbing with BIC scoring
-    to refine existing Bayesian network structures from data. It can start
-    from an initial structure and improve it.
+    Attributes:
+        logger: Logger instance for output
+        max_iter: Maximum iterations for hill climbing
     """
     
-    def __init__(self, logger: Optional[logging.Logger] = None, max_iter: int = 20):
+    def __init__(
+        self,
+        logger: Optional[logging.Logger] = None, 
+        max_iter: int = 20
+    ) -> None:
         """
-        Initialize the hill climbing refiner.
+        Initialize hill climbing refiner with logger and iteration limit.
         
         Args:
             logger: Logger instance for output
@@ -40,31 +43,38 @@ class PgmpyHillClimbingRefiner(BaseRefiner):
     
     @property
     def name(self) -> str:
-        """Return the name of the refiner."""
+        """Name of the refiner implementation."""
         return "PgmpyHillClimbingRefiner"
     
     def run(
         self,
         desc_variables: str,
-        dag_variables: list,
+        dag_variables: list[str],
         dag: pd.DataFrame,
         observation: pd.DataFrame,
         init_generation: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Refine an existing Bayesian Network structure using hill climbing.
+        Refine BN structure using hill climbing with BIC scoring.
         
         Args:
             desc_variables: Variable descriptions (unused, for compatibility)
             dag_variables: List of variable names
-            dag: True DAG structure (for evaluation)
-            observation: Observed data for structure refinement
-            init_generation: Initial BN structure to refine (optional)
-            **kwargs: Additional parameters
+            dag: True DAG structure as adjacency matrix
+            observation: Observed data for refinement
+            init_generation: Initial BN structure to refine
+            **kwargs: Additional parameters (unused)
             
         Returns:
-            Dictionary containing refined structure and metrics
+            Dict with results including:
+            - 'Matrix': Adjacency matrix of refined structure
+            - 'Graph': NetworkX graph representation
+            - 'Score': Final BIC score
+            - 'final_nhd/shd': Distance metrics from true DAG
+        
+        Raises:
+            ValueError: If observation data is invalid
         """
         self._validate_inputs(observation, init_generation)
         
@@ -122,7 +132,7 @@ class PgmpyHillClimbingRefiner(BaseRefiner):
                 )
             
             # Calculate final metrics
-            _, _, f1_score, accuracy, final_nhd, final_shd = evaluate_generation(
+            _, _, _, _, final_nhd, final_shd = evaluate_generation(
                 dag_input=dag,
                 pred_input=matrix,
                 logger=self.logger,
@@ -149,8 +159,21 @@ class PgmpyHillClimbingRefiner(BaseRefiner):
             self.logger.error(f"Error in hill climbing refinement: {e}")
             raise
     
-    def _dag_to_adjacency_matrix(self, dag: DAG, dag_variables: list) -> pd.DataFrame:
-        """Convert a DAG to adjacency matrix format."""
+    def _dag_to_adjacency_matrix(
+        self,
+        dag: DAG,
+        dag_variables: list[str],
+    ) -> pd.DataFrame:
+        """
+        Convert pgmpy DAG to pandas DataFrame adjacency matrix.
+        
+        Args:
+            dag: pgmpy DAG object
+            dag_variables: List of variable names
+            
+        Returns:
+            pd.DataFrame: Adjacency matrix representation
+        """
         matrix = pd.DataFrame(0, index=dag_variables, columns=dag_variables)
         
         for edge in dag.edges():

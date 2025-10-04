@@ -1,21 +1,17 @@
 """
-BNSynth Workflow Controller for Bayesian Network Synthesis
+BNSynth Workflow Controller
 
-This module provides the main workflow controller for BNSynth that orchestrates 
-generation and refinement workflows. It supports:
-- Generation: Create BN structures using LLM-based or traditional generators (data-free or data-dependent)
-- Refinement: Refine existing structures using LLM-enhanced or traditional refiners (data-dependent)
-- Pipeline: Generate then refine in sequence
+Orchestrates Bayesian Network structure learning workflows:
+- Generation: Creates BN structures using LLM-based or traditional methods
+- Refinement: Improves existing BN structures using data
+- Pipeline: Combines generation and refinement in sequence
 
-The controller enables flexible BN synthesis combining:
-- LLM-enforced methods (PromptBN, ReActBN) with traditional algorithms (Hill Climbing)
-- Data-dependent structural learning (using observation data) with data-free generation
-- Initial graph refinement with de novo structure generation
+Supports both data-free (LLM) and data-dependent (statistical) approaches.
 """
 
 import logging
 import pandas as pd
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass
 import os
 
@@ -24,12 +20,23 @@ from utils.eval_utils import evaluate_generation
 from utils.graph_utils import construct_matrix_from_bn_dict
 from errors.generation_error import MaxRetriesError, InvalidDAGError, ParseResponseError
 from errors.pipeline_error import MissingGenerationsError
-from utils.path_utils import get_experiment_path
+from generators.base import BaseGenerator
+from refiners.base import BaseRefiner
 
 
 @dataclass
 class WorkflowResult:
-    """Result container for workflow execution."""
+    """
+    Container for workflow execution results with status and metrics.
+    
+    Attributes:
+        workflow_type: Type of workflow ('generation', 'refinement', 'pipeline')
+        success: Whether the workflow completed successfully
+        dataset: Name of the dataset used
+        generation_results: DataFrame with generation metrics (if applicable)
+        refinement_results: DataFrame with refinement metrics (if applicable)
+        error: Error message if workflow failed
+    """
     workflow_type: str
     success: bool
     dataset: str
@@ -40,17 +47,16 @@ class WorkflowResult:
 
 class WorkflowController:
     """
-    Main workflow controller for BNSynth: Bayesian Network Synthesis Framework.
+    Orchestrates BN structure learning workflows (generation, refinement, pipeline).
     
-    This controller orchestrates three types of workflows:
-    1. Generation: Create BN structures using LLM-based (data-free) or traditional (data-dependent) generators
-    2. Refinement: Refine existing structures using LLM-enhanced or traditional refiners (data-dependent)
-    3. Pipeline: Execute generation followed by refinement in sequence
+    Combines LLM-based and traditional algorithms for both data-free and
+    data-dependent approaches to Bayesian Network structure learning.
     
-    Supports flexible combination of:
-    - LLM-enforced methods (PromptBN, ReActBN) and traditional algorithms (Hill Climbing)
-    - Data-dependent structural learning and data-free generation
-    - Initial graph refinement and de novo structure generation
+    Attributes:
+        config: Configuration dictionary with workflow settings
+        logger: Logger instance for output
+        exp_data_dir: Experiment data directory path
+        workflow_type: Type of workflow to execute
     """
     
     def __init__(
@@ -58,22 +64,33 @@ class WorkflowController:
         config: Dict[str, Any],
         logger: logging.Logger,
         exp_data_dir: str,
-    ):
+    ) -> None:
         """
-        Initialize the workflow controller.
+        Initialize controller with config, logger, and output directory.
         
         Args:
-            config: Complete configuration dictionary
+            config: Configuration dictionary with workflow settings
             logger: Logger instance for output
-            exp_data_dir: Experiment data directory
+            exp_data_dir: Experiment data directory path
         """
         self.config = config
         self.logger = logger
         self.exp_data_dir = exp_data_dir
         self.workflow_type = config['workflow']
         
-    def _load_data_for_dataset(self, dataset):
-        """Load DAG, variables, descriptions, and observation for a specific dataset."""
+    def _load_data_for_dataset(
+        self,
+        dataset: str,
+    ) -> tuple[pd.DataFrame, list, str, Optional[pd.DataFrame]]:
+        """
+        Load DAG, variables, descriptions, and observations for dataset.
+        
+        Args:
+            dataset: Name of the dataset to load
+            
+        Returns:
+            tuple: (dag, dag_variables, desc_variables, observation)
+        """
         dag, dag_variables, desc_variables = load_data(
             self.config['data']['input_data']['source'],
             dataset,
@@ -91,8 +108,16 @@ class WorkflowController:
             self.logger.info(f"[Data] {len(observation)} observations loaded for dataset {dataset}")
         return dag, dag_variables, desc_variables, observation
     
-    def _load_generator(self) -> Any:
-        """Load and instantiate the generator for generation workflow."""
+    def _load_generator(self) -> BaseGenerator:
+        """
+        Load appropriate generator based on configuration settings.
+        
+        Returns:
+            Generator: Instantiated generator object
+            
+        Raises:
+            ValueError: If unknown generator specified in config
+        """
         generator_config = self.config['generation']
         generator_name = generator_config['generator']
         
@@ -117,8 +142,16 @@ class WorkflowController:
         self.logger.info(f"[Generator] {generator_name} generator loaded")
         return generator
     
-    def _load_refiner(self) -> Any:
-        """Load and instantiate the refiner for refinement workflow."""
+    def _load_refiner(self) -> BaseRefiner:
+        """
+        Load appropriate refiner based on configuration settings.
+        
+        Returns:
+            Refiner: Instantiated refiner object
+            
+        Raises:
+            ValueError: If unknown refiner specified in config
+        """
         refinement_config = self.config['refinement']
         # Map algorithm names to their refiner classes
         # (config['refinement']['llm']['algorithm'] is kept for backward compatibility with config files)
@@ -136,12 +169,25 @@ class WorkflowController:
     
     def execute_generation_workflow(
         self,
-        dataset,
-        generator,
+        dataset: str,
+        generator: BaseGenerator,
     ) -> WorkflowResult:
         """
-        Execute the generation workflow for a specific dataset using a provided generator.
-        Raises an error if dataset is None.
+        Execute generation workflow for dataset using specified generator.
+        
+        Args:
+            dataset: Name of the dataset to use
+            generator: Generator instance to use
+            
+        Returns:
+            WorkflowResult: Results container with success status and metrics
+            
+        Raises:
+            ValueError: If dataset or generator is None
+            InvalidDAGError: If generated DAG is invalid
+            ParseResponseError: If LLM response cannot be parsed
+            MaxRetriesError: If max retries reached
+            MissingGenerationsError: If generations are missing
         """
         if dataset is None:
             raise ValueError("A dataset must be provided to execute_generation_workflow.")
@@ -179,18 +225,25 @@ class WorkflowController:
     
     def execute_refinement_workflow(
         self,
-        dataset,
-        refiner,
+        dataset: str,
+        refiner: BaseRefiner,
     ) -> WorkflowResult:
         """
-        Execute the refinement workflow for a specific dataset using a provided refiner.
-        Raises an error if dataset is None.
-        """
-        if dataset is None:
-            raise ValueError("A dataset must be provided to execute_refinement_workflow.")
-        if refiner is None:
-            raise ValueError("A refiner must be provided to execute_refinement_workflow.")
+        Execute refinement workflow for dataset using specified refiner.
         
+        Args:
+            dataset: Name of the dataset to use
+            refiner: Refiner instance to use
+            
+        Returns:
+            WorkflowResult: Results container with success status and metrics
+            
+        Raises:
+            InvalidDAGError: If refined DAG is invalid
+            ParseResponseError: If LLM response cannot be parsed
+            MaxRetriesError: If max retries reached
+            MissingGenerationsError: If initial generations are missing
+        """
         dag, dag_variables, desc_variables, observation = self._load_data_for_dataset(dataset)
         self.logger.info(f"[Data] DAG, variables, and descriptions loaded for dataset {dataset}")
         
@@ -224,7 +277,12 @@ class WorkflowController:
                 refinement_results=result_df
             )
             
-        except (InvalidDAGError, ParseResponseError, MaxRetriesError, MissingGenerationsError) as e:
+        except (
+            InvalidDAGError,
+            ParseResponseError,
+            MaxRetriesError,
+            MissingGenerationsError,
+        ) as e:
             self.logger.error("Refinement workflow failed: %s", e, exc_info=True)
             return WorkflowResult(
                 workflow_type="refinement",
@@ -235,16 +293,27 @@ class WorkflowController:
     
     def execute_pipeline_workflow(
         self,
-        dataset,
-        generator,
-        refiner
+        dataset: str,
+        generator: BaseGenerator,
+        refiner: BaseRefiner
     ) -> WorkflowResult:
         """
-        Execute the pipeline workflow for a specific dataset using provided generator and refiner.
-        Raises an error if dataset is None.
+        Execute generation+refinement pipeline for dataset using specified components.
+        
+        Args:
+            dataset: Name of the dataset to use
+            generator: Generator instance to use
+            refiner: Refiner instance to use
+            
+        Returns:
+            WorkflowResult: Results container with success status and metrics
+            
+        Raises:
+            InvalidDAGError: If DAG is invalid
+            ParseResponseError: If LLM response cannot be parsed
+            MaxRetriesError: If max retries reached
+            MissingGenerationsError: If generations are missing
         """
-        if dataset is None:
-            raise ValueError("A dataset must be provided to execute_pipeline_workflow.")
         self.logger.info(f"[Data] DAG, variables, and descriptions loaded for dataset {dataset}")
         
         self.logger.info("=== Starting Pipeline Workflow ===")
@@ -295,14 +364,33 @@ class WorkflowController:
     
     def _run_generation_experiment(
         self,
-        generator,
-        dataset,
-        desc_variables,
-        dag_variables,
-        observation,
-        dag,
+        generator: BaseGenerator,
+        dataset: str,
+        desc_variables: str,
+        dag_variables: list,
+        observation: Optional[pd.DataFrame],
+        dag: pd.DataFrame,
     ) -> pd.DataFrame:
-        """Run the generation experiment (adapted from run_generation.py)."""
+        """
+        Run BN generation experiment and collect performance metrics.
+        
+        Args:
+            generator: Generator instance to use
+            dataset: Name of the dataset
+            desc_variables: Variable descriptions
+            dag_variables: List of variable names
+            observation: Observation data (optional)
+            dag: True DAG structure for evaluation
+            
+        Returns:
+            pd.DataFrame: Results dataframe with metrics
+            
+        Raises:
+            InvalidDAGError: If generated DAG is invalid
+            ParseResponseError: If LLM response cannot be parsed
+            MaxRetriesError: If max retries reached
+            MissingGenerationsError: If generations are missing
+        """
         import time
         from utils.io_utils import write_error_result, write_result
         count = 0
@@ -432,15 +520,29 @@ class WorkflowController:
     
     def _run_refinement_experiment(
         self,
-        refiner,
-        dataset,
-        generations,
-        observation,
-        desc_variables,
-        dag_variables,
-        dag,
+        refiner: BaseRefiner,
+        dataset: str,
+        generations: list,
+        observation: pd.DataFrame,
+        desc_variables: str,
+        dag_variables: list,
+        dag: pd.DataFrame,
     ) -> pd.DataFrame:
-        """Run the refinement experiment (adapted from run_refine.py)."""
+        """
+        Run BN refinement experiment on initial structures and collect metrics.
+        
+        Args:
+            refiner: Refiner instance to use
+            dataset: Name of the dataset
+            generations: Initial BN structures to refine
+            observation: Observation data
+            desc_variables: Variable descriptions
+            dag_variables: List of variable names
+            dag: True DAG structure for evaluation
+            
+        Returns:
+            pd.DataFrame: Results dataframe with metrics
+        """
         import numpy as np
         from utils.data_utils import save_history, save_matrix_graph
         from utils.io_utils import write_result
@@ -542,14 +644,31 @@ class WorkflowController:
     
     def _run_single_refinement(
         self,
-        refiner,
-        observation,
-        init_generation,
-        desc_variables,
-        dag_variables,
-        dag,
+        refiner: BaseRefiner,
+        observation: pd.DataFrame,
+        init_generation: Optional[Dict[str, Any]],
+        desc_variables: str,
+        dag_variables: list,
+        dag: pd.DataFrame,
     ) -> Dict[str, Any]:
-        """Run a single refinement experiment."""
+        """
+        Run a single BN refinement iteration with error handling and metrics tracking.
+        
+        Args:
+            refiner: Refiner instance to use
+            observation: Observation data
+            init_generation: Initial BN structure to refine
+            desc_variables: Variable descriptions
+            dag_variables: List of variable names
+            dag: True DAG structure for evaluation
+            
+        Returns:
+            Dict[str, Any]: Results dictionary with metrics and refined structure
+            
+        Raises:
+            InvalidDAGError: If refined DAG is invalid
+            MaxRetriesError: If max retries reached
+        """
         import time
         # Import already available from module level
         
@@ -599,12 +718,26 @@ class WorkflowController:
             "MetricsHistory": refiner_result.get("MetricsHistory")
         }
     
-    def execute(self, dataset, worker=None) -> WorkflowResult:
+    def execute(
+        self,
+        dataset: str,
+        worker: Union[
+            BaseGenerator, BaseRefiner, tuple[BaseGenerator, BaseRefiner],
+        ],
+    ) -> WorkflowResult:
         """
-        Execute the configured workflow for a specific dataset, using the provided generator/refiner/tuple as needed.
+        Execute configured workflow (generation/refinement/pipeline) for dataset.
+        
+        Args:
+            dataset: Name of the dataset to use
+            worker: Generator, Refiner, or (Generator, Refiner) tuple based on workflow
+            
+        Returns:
+            WorkflowResult: Results container with success status and metrics
+            
+        Raises:
+            ValueError: If workflow type is unknown
         """
-        if dataset is None:
-            raise ValueError("A dataset must be provided to execute the workflow.")
         if self.workflow_type == "generation":
             return self.execute_generation_workflow(dataset, worker)
         elif self.workflow_type == "refinement":
@@ -615,9 +748,13 @@ class WorkflowController:
         else:
             raise ValueError(f"Unknown workflow type: {self.workflow_type}")
 
-    def analyze_results(self):
+    def analyze_results(self) -> None:
+        """
+        Run appropriate analysis based on workflow type and save statistics.
+        
+        Analyzes experiment results and saves statistics to the configured output directory.
+        """
         from utils.analyze_utils import analyze_generation, analyze_refinement
-        """Run the appropriate analysis for the workflow type."""
         exp_root = self.config['data']['experiment_data']['experiment_name']
         results_dir = os.path.join(
             self.config['data']['experiment_data']['root'],
@@ -650,7 +787,16 @@ class WorkflowController:
             self.logger.warning(f"Unknown workflow type for analysis: {self.workflow_type}")
             return None
 
-    def run_full_experiment(self, max_workers=4):
+    def run_full_experiment(self, max_workers=4) -> None:
+        """
+        Run experiment on all datasets with optional parallelization.
+        
+        Args:
+            max_workers: Maximum number of parallel workers for dataset processing
+            
+        Raises:
+            ValueError: If workflow type is unknown
+        """
         datasets = self.config['data']['input_data']['dataset']
         if not isinstance(datasets, list):
             datasets = [datasets]
@@ -664,7 +810,7 @@ class WorkflowController:
             worker = (self._load_generator(), self._load_refiner())
         else:
             raise ValueError(f"Unknown workflow type: {self.workflow_type}")
-        def run_for_dataset(dataset):
+        def run_for_dataset(dataset) -> WorkflowResult:
             return self.execute(dataset, worker)
         if len(datasets) == 1:
             run_for_dataset(datasets[0])

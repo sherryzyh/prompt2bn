@@ -1,8 +1,7 @@
 """
-PGMPY MMHC generator for Bayesian network structure generation.
+MMHC generator using pgmpy.
 
-This module implements the MMHC algorithm using pgmpy for generating
-Bayesian network structures from data.
+Implements structure generation using pgmpy's Max-Min Hill Climbing algorithm.
 """
 
 import logging
@@ -17,11 +16,18 @@ class PgmpyMMHCGenerator(BaseGenerator):
     """
     MMHC generator using pgmpy's MmhcEstimator.
     
-    This generator uses pgmpy's MMHC algorithm to generate Bayesian network
-    structures. MMHC combines constraint-based and score-based methods.
+    Generates Bayesian network structures from observation data using
+    Max-Min Hill Climbing algorithm, which combines constraint-based
+    and score-based methods.
+    
+    Attributes:
+        logger: Logger instance for output
     """
     
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(
+        self,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
         """
         Initialize the MMHC generator.
         
@@ -32,13 +38,13 @@ class PgmpyMMHCGenerator(BaseGenerator):
     
     @property
     def name(self) -> str:
-        """Return the name of the generator."""
+        """Name of the generator implementation."""
         return "PgmpyMMHCGenerator"
     
     def run(
         self,
         desc_variables: str,
-        dag_variables: list,
+        dag_variables: list[str],
         observation: Optional[pd.DataFrame] = None,
         generations: Optional[list] = None,
         **kwargs
@@ -51,12 +57,17 @@ class PgmpyMMHCGenerator(BaseGenerator):
             dag_variables: List of variable names
             observation: Observed data for structure learning
             generations: Previous generations (unused, for compatibility)
-            **kwargs: Additional generator-specific parameters
+            **kwargs: Additional parameters (unused)
             
         Returns:
-            Tuple of (validation_status, results_dict) where:
+            Tuple containing:
             - validation_status: 1 if valid DAG, 0 otherwise
-            - results_dict: Dictionary containing generated structure
+            - results_dict: Dictionary with generated structure and metrics
+              including 'Generation' (structure representation) and 'Matrix'
+              (adjacency matrix)
+              
+        Raises:
+            ValueError: If observation data is missing or invalid
         """
         if observation is None:
             raise ValueError("Observation data is required for traditional generators")
@@ -71,10 +82,16 @@ class PgmpyMMHCGenerator(BaseGenerator):
             learned_model = mmhc.estimate()
             
             # Convert to adjacency matrix
-            matrix = self._dag_to_adjacency_matrix(learned_model, dag_variables)
+            matrix = self._dag_to_adjacency_matrix(
+                dag=learned_model,
+                dag_variables=dag_variables,
+            )
             
             # Create a generation dict for compatibility
-            generation = self._dag_to_generation_dict(learned_model, dag_variables)
+            generation = self._dag_to_generation_dict(
+                dag=learned_model,
+                dag_variables=dag_variables,
+            )
             
             results = {
                 'Generation': generation,
@@ -85,6 +102,6 @@ class PgmpyMMHCGenerator(BaseGenerator):
             return 1, results  # Always return 1 for valid DAG
             
         except Exception as e:
-            self.logger.error(f"Error in MMHC generation: {e}")
+            self.logger.error("Error in MMHC generation: %s", e)
             return 0, {'Generation': None, 'Matrix': None}
     

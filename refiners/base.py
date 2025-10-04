@@ -1,12 +1,8 @@
 """
-BNSynth Base Refiner Module
+Base interface for Bayesian Network structure refiners.
 
-This module defines the base interface for Bayesian Network structure refiners
-used in BNSynth. Refiners take existing BN structures and improve them using:
-- LLM-enhanced methods: Intelligent refinement with LLM reasoning (e.g., ReActBN)
-- Traditional methods: Statistical optimization algorithms (e.g., Hill Climbing, PC, MMHC)
-
-All refiners are data-dependent, requiring observation data for structure optimization.
+Defines the common API for both LLM-enhanced and traditional refiners that optimize existing BN structures using
+observation data.
 """
 
 import logging
@@ -17,19 +13,18 @@ import pandas as pd
 
 class BaseRefiner(ABC):
     """
-    Abstract base class for Bayesian Network structure refiners in BNSynth.
+    Abstract base class for Bayesian Network structure refiners.
     
-    Refiners take existing BN structures (from generators or initial graphs) and
-    improve them using data-dependent optimization. Supports:
-    - LLM-enhanced refinement: Uses LLM reasoning for intelligent structure optimization
-    - Traditional refinement: Statistical algorithms for data-driven structure learning
-    
-    All refiners require observation data for structure optimization.
+    Attributes:
+        logger: Logger instance for output
     """
     
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(
+        self,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
         """
-        Initialize the refiner.
+        Initialize refiner with optional logger.
         
         Args:
             logger: Logger instance for output
@@ -39,39 +34,37 @@ class BaseRefiner(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Return the name of the refiner."""
-        pass
+        """Name of the refiner implementation."""
+        raise NotImplementedError("Subclasses must implement .name()")
     
     @abstractmethod
     def run(
         self,
         desc_variables: str,
-        dag_variables: list,
+        dag_variables: list[str],
         dag: pd.DataFrame,
         observation: pd.DataFrame,
         init_generation: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Refine an existing Bayesian Network structure.
+        Refine an existing Bayesian Network structure using observation data.
         
         Args:
-            desc_variables: Variable descriptions
+            desc_variables: Variable descriptions in string format
             dag_variables: List of variable names
-            dag: True DAG structure (for evaluation)
+            dag: True DAG structure as adjacency matrix
             observation: Observed data for refinement
             init_generation: Initial BN structure to refine
             **kwargs: Additional refiner-specific parameters
             
         Returns:
-            Dictionary containing:
+            Dict with results including:
             - 'Matrix': Adjacency matrix of refined structure
             - 'Graph': NetworkX graph representation
             - 'Score': Final score achieved
-            - 'Refiner': Refiner name
-            - Additional refiner-specific results
+            - Additional refiner-specific metrics
         """
-        pass
     
     def _validate_inputs(
         self, 
@@ -79,14 +72,14 @@ class BaseRefiner(ABC):
         init_generation: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        Validate input data and initial generation.
+        Validate observation data and initial generation.
         
         Args:
-            observation: Input data to validate
+            observation: Observation data to validate
             init_generation: Initial structure to validate
             
         Raises:
-            ValueError: If input data is invalid
+            ValueError: If observation data is invalid or insufficient
         """
         if observation is None or observation.empty:
             raise ValueError("Observation data cannot be None or empty")
@@ -95,26 +88,42 @@ class BaseRefiner(ABC):
             raise ValueError("At least 2 variables are required for structure refinement")
         
         if init_generation is None:
-            self.logger.warning("No initial generation provided, starting from empty structure")
+            self.logger.warning(
+                "No initial generation provided, starting from empty structure"
+            )
         
-        self.logger.info(f"Input validation passed: {len(observation.columns)} variables, {len(observation)} samples")
+        self.logger.info(
+            "Input validation passed: %d variables, %d samples",
+            len(observation.columns),
+            len(observation)
+        )
     
-    def _log_results(self, results: Dict[str, Any]) -> None:
+    def _log_results(
+        self,
+        results: Dict[str, Any],
+    ) -> None:
         """
-        Log refiner results.
+        Log refinement results to the configured logger.
         
         Args:
-            results: Results dictionary from run()
+            results: Results dictionary containing metrics and structures
         """
-        self.logger.info(f"Refiner {self.name} completed")
-        self.logger.info(f"Final score: {results.get('Score', 'N/A')}")
+        self.logger.info("Refiner %s completed", self.name)
+        self.logger.info("Final score: %s", results.get('Score', 'N/A'))
         
         if 'Matrix' in results:
             matrix = results['Matrix']
             if hasattr(matrix, 'shape'):
-                self.logger.info(f"Refined structure: {matrix.shape[0]}x{matrix.shape[1]} adjacency matrix")
+                self.logger.info(
+                    "Refined structure: %dx%d adjacency matrix",
+                    matrix.shape[0],
+                    matrix.shape[1],
+                )
         
         if 'Graph' in results:
             graph = results['Graph']
             if hasattr(graph, 'edges'):
-                self.logger.info(f"Number of edges in refined structure: {len(graph.edges)}")
+                self.logger.info(
+                    "Number of edges in refined structure: %d",
+                    len(graph.edges),
+                )

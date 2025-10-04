@@ -1,8 +1,8 @@
 """
-Generators module for Bayesian Network structure generation.
+Bayesian Network structure generators.
 
-This module contains all methods that can generate Bayesian Network structures from scratch,
-including both LLM-based generators and traditional algorithms.
+Provides both LLM-based (data-free) and traditional (data-dependent)
+approaches for generating Bayesian Network structures from scratch.
 """
 
 from .base import BaseGenerator
