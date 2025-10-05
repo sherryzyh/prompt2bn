@@ -15,9 +15,9 @@ BNSynth is an open-source toolkit for generating and refining Bayesian network s
 - [Configuration Files: Structure and Examples](#configuration-files-structure-and-examples)
 - [Running Workflows](#running-workflows)
 - [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
 - [License & Citation](#license--citation)
 - [Contact](#contact)
+- [Contributing](#contributing)
 
 ## 🚀 Quick Start
 
@@ -198,17 +198,6 @@ File: `asia_metadata.csv`
 | 6    | either   | tuberculosis versus lung cancer/bronchitis   | a two-level factor with levels yes and no.   |
 | 7    | xray     | chest X-ray                                 | a two-level factor with levels yes and no.   |
 | 8    | dysp     | dyspnoae                                    | a two-level factor with levels yes and no.   |
- 
-## 🤝 Contributing
-
-Contributions are welcome! To propose changes:
-
-1. Fork the repository and create a feature branch.
-2. Make focused edits with clear commit messages.
-3. Ensure README examples remain accurate; add/update docs as needed.
-4. Open a pull request describing the motivation and changes.
-
-If you find a bug or have a feature request, please open an issue with steps to reproduce or a concise proposal.
 
 ## 🛠️ Configuration Files: Structure and Examples
 
@@ -360,3 +349,15 @@ If you use BNSynth in your research, please cite:
 ## 📬 Contact
 
 For questions, support, or feedback, please contact: yinghuan.flash@gmail.com
+
+ 
+## 🤝 Contributing
+
+Contributions are welcome! To propose changes:
+
+1. Fork the repository and create a feature branch.
+2. Make focused edits with clear commit messages.
+3. Ensure README examples remain accurate; add/update docs as needed.
+4. Open a pull request describing the motivation and changes.
+
+If you find a bug or have a feature request, please open an issue with steps to reproduce or a concise proposal.
