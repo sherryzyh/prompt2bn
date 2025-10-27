@@ -1,6 +1,6 @@
-# BNSynth: Bayesian Network Synthesis Framework
+# Prompt2BN: LLM-Driven Bayesian Network Structure Discovery
 
-BNSynth is an open-source toolkit for generating and refining Bayesian network structures, supporting both large language models (LLMs) and classic statistical algorithms. It is designed for researchers and practitioners who need flexible, reproducible, and state-of-the-art workflows for structure learning.
+Prompt2BN is an open-source framework for discovering and refining Bayesian network structures by placing large language models at the center of the learning loop. It supports both data-free structure generation from metadata and data-aware refinement with classical scores such as BIC, providing flexible and reproducible workflows for state-of-the-art structure learning across research and practical applications.
 
 ### Features
 - Hybrid approach: combine LLM-based and algorithmic methods (Hill Climbing, PC, MMHC)
