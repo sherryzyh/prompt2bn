@@ -339,10 +339,10 @@ If you use BNSynth in your research, please cite:
 
 ```bibtex
 @software{bnsynth,
-  title={BNSynth: Bayesian Network Synthesis Framework},
+  title={Prompt2BN: LLM-Driven Bayesian Network Structure Discovery},
   author={Zhang, Yinghuan and Cui, Zijun and Zhang, Yufei},
   year={2025},
-  url={https://github.com/sherryzyh/bnsynth}
+  url={https://github.com/sherryzyh/prompt2bn}
 }
 ```
 
