@@ -1,6 +1,6 @@
-# Prompt2BN: LLM-Driven Bayesian Network Structure Discovery
+# LLMBN: Bayesian Network Structure Discovery Using Large Language Models
 
-Prompt2BN is an open-source framework for discovering and refining Bayesian network structures by placing large language models at the center of the learning loop. It supports both data-free structure generation from metadata and data-aware refinement with classical scores such as BIC, providing flexible and reproducible workflows for state-of-the-art structure learning across research and practical applications.
+LLMBN is an open-source framework for discovering and refining Bayesian network structures by placing large language models at the center of the learning loop. It supports both data-free structure generation from metadata and data-aware refinement with classical scores such as BIC, providing flexible and reproducible workflows for state-of-the-art structure learning across research and practical applications.
 
 ### Features
 - Hybrid approach: combine LLM-based and algorithmic methods (Hill Climbing, PC, MMHC)
@@ -338,11 +338,11 @@ This project is licensed under the MIT License.
 If you use BNSynth in your research, please cite:
 
 ```bibtex
-@software{bnsynth,
-  title={Prompt2BN: LLM-Driven Bayesian Network Structure Discovery},
+@software{llmbn,
+  title={LLMBN: Bayesian Network Structure Discovery Using Large Language Models},
   author={Zhang, Yinghuan and Cui, Zijun and Zhang, Yufei},
   year={2025},
-  url={https://github.com/sherryzyh/prompt2bn}
+  url={https://github.com/sherryzyh/llmbn}
 }
 ```
 
