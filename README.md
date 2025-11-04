@@ -1,4 +1,5 @@
 # LLMBN: Bayesian Network Structure Discovery Using Large Language Models
+[![arXiv](https://img.shields.io/badge/arXiv-2501.01234-b31b1b.svg)](https://arxiv.org/pdf/2511.00574)
 
 LLMBN is an open-source framework for discovering and refining Bayesian network structures by placing large language models at the center of the learning loop. It supports both data-free structure generation from metadata and data-aware refinement with classical scores such as BIC, providing flexible and reproducible workflows for state-of-the-art structure learning across research and practical applications.
 
